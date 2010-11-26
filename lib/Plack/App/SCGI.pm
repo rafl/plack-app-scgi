@@ -34,39 +34,38 @@ sub call {
             sub {
                 my ($chunk) = @_;
 
-                if (defined $chunk) {
-                    $buf .= $chunk;
-
-                    if (!$writer) {
-                        my ($start) = $buf =~ m/^(.*?(?:\x0d\x0a){2})/s
-                            or return;
-
-                        substr $buf, 0, length($start), '';
-
-                        my ($status, $headers) = do {
-                            my $m = HTTP::Response->parse($start);
-                            ($m->code, $m->headers);
-                        };
-
-                        $writer = $respond->([
-                            200,
-                            [map {
-                                my $k = $_;
-                                (map { ($k => $_) } $headers->header($k))
-                            } $headers->header_field_names]
-                        ]);
-                    }
-
-                    if (length $buf) {
-                        $writer->write($buf);
-                        $buf = '';
-                    }
-                }
-                else {
+                unless (defined $chunk) {
                     $writer->close;
                     $cv->send;
+                    return
                 }
 
+                $buf .= $chunk;
+
+                if (!$writer) {
+                    my ($start) = $buf =~ m/^(.*?(?:\x0d\x0a){2})/s
+                        or return;
+
+                    substr $buf, 0, length($start), '';
+
+                    my ($status, $headers) = do {
+                        my $m = HTTP::Response->parse($start);
+                        ($m->code, $m->headers);
+                    };
+
+                    $writer = $respond->([
+                        200,
+                        [map {
+                            my $k = $_;
+                            (map { ($k => $_) } $headers->header($k))
+                        } $headers->header_field_names]
+                    ]);
+                }
+
+                if (length $buf) {
+                    $writer->write($buf);
+                    $buf = '';
+                }
             },
         );
 
